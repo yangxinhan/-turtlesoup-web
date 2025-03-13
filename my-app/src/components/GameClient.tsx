@@ -10,12 +10,14 @@ import QuestionCard from './QuestionCard';
 
 export default function GameClient() {
   const { user, login, isLoading } = useAuth();
-  const { room, error, createRoom, joinRoom, leaveRoom } = useRoom();
+  const { room, error, createRoom, joinRoom, leaveRoom, sendMessage } = useRoom();
   const [roomCode, setRoomCode] = useState('');
   const [nickname, setNickname] = useState('');
   const [tempRoomCode, setTempRoomCode] = useState<string | null>(null);
   const [isJoining, setIsJoining] = useState(false);
   const [joiningRoomCode, setJoiningRoomCode] = useState<string | null>(null);
+  const [newQuestion, setNewQuestion] = useState('');
+  const [isComposingQuestion, setIsComposingQuestion] = useState(false);
 
   const handleCreateRoom = async () => {
     try {
@@ -31,7 +33,13 @@ export default function GameClient() {
       if (nickname.trim()) {
         await login(nickname);
         if (user && tempRoomCode) {
-          await createRoom({ ...user, name: nickname, isHost: true });
+          // 設定創建者為關主
+          const hostUser = {
+            ...user,
+            name: nickname,
+            isHost: true
+          };
+          await createRoom(hostUser);
           setTempRoomCode(null);
         }
       }
@@ -62,6 +70,42 @@ export default function GameClient() {
     } finally {
       setIsJoining(false);
     }
+  };
+
+  const handleQuestionSubmit = (question: string) => {
+    if (!user || !room) return;
+    
+    const newQuestion = {
+      id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      content: question,
+      askedBy: user.name,
+      timestamp: new Date().toLocaleTimeString()
+    };
+
+    sendMessage('CHAT_MESSAGE', { 
+      roomId: room.id, 
+      message: {
+        ...newQuestion,
+        type: 'question'
+      }
+    });
+
+    // 清空輸入框
+    const input = document.querySelector('input[placeholder="輸入問題..."]') as HTMLInputElement;
+    if (input) {
+      input.value = '';
+    }
+  };
+
+  const handleAnswerQuestion = (questionId: string, isCorrect: boolean) => {
+    if (!room) return;
+    
+    const answer = isCorrect ? 'correct' : 'incorrect';
+    sendMessage('QUESTION_ANSWER', {
+      roomId: room.id,
+      questionId,
+      answer
+    });
   };
 
   if (isLoading) {
@@ -120,10 +164,10 @@ export default function GameClient() {
 
   if (joiningRoomCode) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-100">
-        <div className="bg-white p-8 rounded-lg shadow-lg max-w-md w-full">
+      <div className="min-h-screen flex items中心 justify-center bg-gray-100">
+        <div className="bg白色 p-8 rounded-lg shadow-lg max-w-md w-full">
           <h1 className="text-2xl font-bold mb-6 text-center text-gray-900">加入房間</h1>
-          <div className="mb-6 text-center">
+          <div className="mb-6 text中心">
             <p className="text-gray-600 mb-2">房間號碼</p>
             <p className="font-mono text-2xl font-bold text-blue-600">{joiningRoomCode}</p>
           </div>
@@ -138,7 +182,7 @@ export default function GameClient() {
             <button
               onClick={handleJoinRoom}
               disabled={!nickname.trim() || isJoining}
-              className="w-full bg-blue-600 text-white px-4 py-3 rounded-md hover:bg-blue-700 transition-colors font-medium disabled:bg-gray-400"
+              className="w-full bg-blue-600 text白色 px-4 py-3 rounded-md hover:bg-blue-700 transition-colors font-medium disabled:bg-gray-400"
             >
               {isJoining ? '加入中...' : '確認加入'}
             </button>
@@ -151,7 +195,7 @@ export default function GameClient() {
   if (!room) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-100">
-        <div className="bg-white p-8 rounded-lg shadow-lg max-w-md w-full">
+        <div className="bg-white p-8 rounded-lg shadow-lg max-w-md w全">
           <h1 className="text-2xl font-bold mb-6 text-center text-gray-900">海龜湯遊戲室</h1>
           {error && (
             <div className="mb-4 p-3 bg-red-100 text-red-700 rounded">
@@ -212,7 +256,7 @@ export default function GameClient() {
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
           {/* 左側 - 當前題目區塊 */}
           <div className="lg:col-span-4 space-y-4">
-            <div className="bg-white rounded-lg shadow-sm p-4">
+            <div className="bg-white rounded-lg shadow-sm p-4 h-full flex flex-col">
               <h2 className="text-xl font-bold mb-4 text-gray-900">當前題目</h2>
               <div className="border-b pb-4 mb-4">
                 <p className="text-lg text-gray-800">
@@ -221,51 +265,82 @@ export default function GameClient() {
                     : '等待遊戲開始...'}
                 </p>
               </div>
-              <div className="bg-gray-50 p-4 rounded-lg">
-                <h3 className="font-semibold text-gray-900">關主資訊</h3>
-                <p className="text-gray-700">關主：{room?.gameState.host?.name || '等待關主加入'}</p>
-              </div>
-            </div>
-            
-            {user?.isHost && <HostPanel gameState={room.gameState} onUpdateGame={(updates) => setGameState(prev => ({ ...prev, ...updates }))} />}
-            
-            {/* 在線玩家列表 */}
-            <div className="bg-white rounded-lg shadow-sm p-4">
-              <h3 className="font-semibold text-gray-900 mb-3">在線玩家</h3>
-              <div className="space-y-2">
-                {room?.players.map((player) => (
-                  <div 
-                    key={player.id}
-                    className="flex items-center gap-2 p-2 bg-gray-50 rounded-lg"
-                  >
-                    <span className="text-gray-800">{player.name}</span>
-                    {player.isHost && (
-                      <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">關主</span>
-                    )}
+              <div className="space-y-4">
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <h3 className="font-semibold text-gray-900 mb-2">關主資訊</h3>
+                  <p className="text-gray-700">關主：{room?.gameState.host?.name || '等待關主加入'}</p>
+                </div>
+                
+                {/* 在線玩家列表移到這裡 */}
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <h3 className="font-semibold text-gray-900 mb-2">在線玩家</h3>
+                  <div className="space-y-2">
+                    {room?.players.map((player) => (
+                      <div 
+                        key={player.id}
+                        className="flex items-center justify-between p-2 bg-white rounded"
+                      >
+                        <span className="text-gray-800">{player.name}</span>
+                        {player.isHost && (
+                          <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">關主</span>
+                        )}
+                      </div>
+                    ))}
                   </div>
-                ))}
+                </div>
               </div>
             </div>
+            
+            {/* 關主回答區塊 */}
+            {user?.isHost && (
+              <div className="bg-white rounded-lg shadow-sm p-4">
+                <h3 className="text-xl font-bold mb-4 text-gray-900">問題回答</h3>
+                <div className="space-y-4">
+                  {room?.gameState.questions
+                    .filter(q => !q.answer)
+                    .map((q) => (
+                      <div key={q.id} className="bg-gray-50 rounded-lg p-4">
+                        <p className="text-gray-800 mb-2">{q.content}</p>
+                        <div className="flex justify-between items-center">
+                          <span className="text-sm text-gray-600">{q.askedBy}</span>
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => handleAnswerQuestion(q.id, true)}
+                              className="px-3 py-1 text-sm bg-green-500 text-white rounded hover:bg-green-600"
+                            >
+                              正確
+                            </button>
+                            <button
+                              onClick={() => handleAnswerQuestion(q.id, false)}
+                              className="px-3 py-1 text-sm bg-red-500 text-white rounded hover:bg-red-600"
+                            >
+                              錯誤
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                </div>
+              </div>
+            )}
           </div>
 
-          {/* 中間 - 已提問問題區塊 */}
+          {/* 中間 - 問題區塊 */}
           <div className="lg:col-span-4">
-            <div className="bg-white rounded-lg shadow-sm p-4 h-full">
-              <h2 className="text-xl font-bold mb-4 text-gray-900">已提問問題</h2>
-              <div className="space-y-3 overflow-y-auto max-h-[calc(100vh-200px)]">
-                {room?.gameState.questions.map((q, index) => (
-                  <QuestionCard key={index} {...q} />
-                ))}
+            <div className="bg-white rounded-lg shadow-sm p-4 h-[calc(100vh-12rem)] flex flex-col">
+              <h2 className="text-xl font-bold mb-4 text-gray-900">問題</h2>
+              <div className="flex-1">
+                <ChatRoom type="question" />
               </div>
             </div>
           </div>
 
           {/* 右側 - 即時討論區塊 */}
           <div className="lg:col-span-4">
-            <div className="bg-white rounded-lg shadow-sm p-4 h-full flex flex-col">
+            <div className="bg-white rounded-lg shadow-sm p-4 h-[calc(100vh-12rem)] flex flex-col">
               <h2 className="text-xl font-bold mb-4 text-gray-900">即時討論</h2>
               <div className="flex-1">
-                <ChatRoom />
+                <ChatRoom type="message" />
               </div>
             </div>
           </div>

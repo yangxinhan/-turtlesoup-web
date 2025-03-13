@@ -10,6 +10,8 @@ interface RoomContextType {
   joinRoom: (code: string, user: User) => Promise<void>;
   leaveRoom: () => void;
   updateGameState: (updates: Partial<Room>) => void;
+  getWebSocket: () => WebSocket | null;
+  sendMessage: (type: string, data: any) => void;  // 添加這行
 }
 
 const RoomContext = createContext<RoomContextType | undefined>(undefined);
@@ -65,7 +67,6 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
 
       } catch (error) {
         console.error('WebSocket 連接錯誤:', error);
-        reconnectTimer = setTimeout(connect, 1000 * Math.min(reconnectAttempts, 5));
       }
     };
 
@@ -106,6 +107,8 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
     sendMessage('UPDATE_ROOM', { roomId: room?.id, updates });
   };
 
+  const getWebSocket = () => wsRef.current;
+
   return (
     <RoomContext.Provider value={{
       room,
@@ -113,7 +116,9 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
       createRoom,
       joinRoom,
       leaveRoom,
-      updateGameState
+      updateGameState,
+      getWebSocket,
+      sendMessage  // 添加這行
     }}>
       {children}
     </RoomContext.Provider>

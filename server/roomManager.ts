@@ -1,4 +1,4 @@
-import { Room, User } from '../my-app/src/types/game';
+import { Room, User, Question } from '../my-app/src/types/game';
 
 export class RoomManager {
   private rooms: Map<string, Room> = new Map();
@@ -16,19 +16,25 @@ export class RoomManager {
 
   createRoom(host: User): Room {
     const code = this.generateRoomCode();
+    // 確保 host.isHost 為 true
+    const hostUser = {
+      ...host,
+      isHost: true
+    };
+    
     const room: Room = {
       id: Date.now().toString(),
       code,
-      host,
-      players: [host],
+      host: hostUser,
+      players: [hostUser],
       gameState: {
         id: '1',
         title: '',
         puzzle: '',
         solution: '',
         status: 'waiting',
-        host,
-        players: [host],
+        host: hostUser,
+        players: [hostUser],
         questions: []
       }
     };
@@ -71,8 +77,12 @@ export class RoomManager {
     return null;
   }
 
-  getRoomById(roomId: string): Room | null {
-    return this.rooms.get(roomId) || null;
+  getRoomById(roomId: string): Room | undefined {
+    const room = this.rooms.get(roomId);
+    if (room) {
+      return room;
+    }
+    return undefined;
   }
 
   removeRoom(roomId: string): void {
@@ -81,5 +91,17 @@ export class RoomManager {
       this.usedCodes.delete(room.code);
       this.rooms.delete(roomId);
     }
+  }
+
+  answerQuestion(roomId: string, questionId: string, answer: 'correct' | 'incorrect'): Room | null {
+    const room = this.rooms.get(roomId);
+    if (room) {
+      const question = room.gameState.questions.find(q => q.id === questionId);
+      if (question) {
+        question.answer = answer;
+      }
+      return room;
+    }
+    return null;
   }
 }
