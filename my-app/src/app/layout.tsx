@@ -28,12 +28,7 @@ export default function RootLayout({
   return (
     <html lang="zh-TW">
       <head>
-        <link 
-          rel="preload"
-          href="/_next/static/css/app/layout.css"
-          as="style"
-          crossOrigin="anonymous"
-        />
+        {/* 移除所有 preload 標籤，讓 Next.js 自動處理資源載入 */}
       </head>
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
         <div id="app">

@@ -7,6 +7,7 @@ import HostPanel from './HostPanel';
 import { GameState, Room } from '../types/game';
 import ChatRoom from './ChatRoom';
 import QuestionCard from './QuestionCard';
+import { RoleManager } from '../utils/roleManager';
 
 export default function GameClient() {
   const { user, login, isLoading } = useAuth();
@@ -18,6 +19,7 @@ export default function GameClient() {
   const [joiningRoomCode, setJoiningRoomCode] = useState<string | null>(null);
   const [newQuestion, setNewQuestion] = useState('');
   const [isComposingQuestion, setIsComposingQuestion] = useState(false);
+  const [selectedRole, setSelectedRole] = useState<'host' | 'player' | 'spectator' | null>(null);
 
   const handleCreateRoom = async () => {
     try {
@@ -30,21 +32,21 @@ export default function GameClient() {
 
   const handleConfirmJoin = async () => {
     try {
-      if (nickname.trim()) {
+      if (nickname.trim() && selectedRole) {
         await login(nickname);
         if (user && tempRoomCode) {
-          // 設定創建者為關主
-          const hostUser = {
+          const newUser = {
             ...user,
             name: nickname,
-            isHost: true
+            role: selectedRole,
+            isHost: selectedRole === 'host'
           };
-          await createRoom(hostUser);
+          await createRoom(newUser);
           setTempRoomCode(null);
         }
       }
     } catch (err) {
-      console.error('加入房間失敗:', err);
+      console.error('創建房間失敗:', err);
     }
   };
 
@@ -56,11 +58,17 @@ export default function GameClient() {
 
   const handleJoinRoom = async () => {
     try {
-      if (nickname.trim() && joiningRoomCode) {
+      if (nickname.trim() && joiningRoomCode && selectedRole) {
         await login(nickname);
         if (user) {
           setIsJoining(true);
-          await joinRoom(joiningRoomCode, { ...user, name: nickname });
+          const playerUser = {
+            ...user,
+            name: nickname,
+            isHost: false,
+            role: selectedRole
+          };
+          await joinRoom(joiningRoomCode, playerUser);
           setJoiningRoomCode(null);
         }
       }
@@ -147,12 +155,47 @@ export default function GameClient() {
               value={nickname}
               onChange={(e) => setNickname(e.target.value)}
               placeholder="輸入暱稱"
-              className="w-full border border-gray-300 rounded-md p-3 text-gray-800 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full border border-gray-300 rounded-md p-3 text-gray-800 bg-white placeholder-gray-500"
             />
+            
+            {/* 新增角色選擇 */}
+            <div className="flex gap-2">
+              <button
+                onClick={() => setSelectedRole('host')}
+                className={`flex-1 p-3 rounded-md border ${
+                  selectedRole === 'host' 
+                    ? 'bg-blue-100 border-blue-500' 
+                    : 'border-gray-300'
+                }`}
+              >
+                關主
+              </button>
+              <button
+                onClick={() => setSelectedRole('player')}
+                className={`flex-1 p-3 rounded-md border ${
+                  selectedRole === 'player' 
+                    ? 'bg-green-100 border-green-500' 
+                    : 'border-gray-300'
+                }`}
+              >
+                玩家
+              </button>
+              <button
+                onClick={() => setSelectedRole('spectator')}
+                className={`flex-1 p-3 rounded-md border ${
+                  selectedRole === 'spectator' 
+                    ? 'bg-gray-100 border-gray-500' 
+                    : 'border-gray-300'
+                }`}
+              >
+                圍觀
+              </button>
+            </div>
+
             <button
               onClick={handleConfirmJoin}
-              disabled={!nickname.trim()}
-              className="w-full bg-blue-600 text-white px-4 py-3 rounded-md hover:bg-blue-700 transition-colors font-medium disabled:bg-gray-400"
+              disabled={!nickname.trim() || !selectedRole}
+              className="w-full bg-blue-600 text-white px-4 py-3 rounded-md hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
             >
               確認並加入
             </button>
@@ -164,12 +207,11 @@ export default function GameClient() {
 
   if (joiningRoomCode) {
     return (
-      <div className="min-h-screen flex items中心 justify-center bg-gray-100">
-        <div className="bg白色 p-8 rounded-lg shadow-lg max-w-md w-full">
+      <div className="min-h-screen flex items-center justify-center bg-gray-100">
+        <div className="bg-white p-8 rounded-lg shadow-lg max-w-md w-full">
           <h1 className="text-2xl font-bold mb-6 text-center text-gray-900">加入房間</h1>
           <div className="mb-6 text中心">
-            <p className="text-gray-600 mb-2">房間號碼</p>
-            <p className="font-mono text-2xl font-bold text-blue-600">{joiningRoomCode}</p>
+            <p className="text-gray-600 mb-2">房間號碼：{joiningRoomCode}</p>
           </div>
           <div className="space-y-4">
             <input
@@ -177,14 +219,104 @@ export default function GameClient() {
               value={nickname}
               onChange={(e) => setNickname(e.target.value)}
               placeholder="輸入暱稱"
-              className="w-full border border-gray-300 rounded-md p-3 text-gray-800 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full border rounded-md p-3 text-gray-800"
             />
+            
+            {/* 新增角色選擇 */}
+            <div className="flex gap-2">
+              <button
+                onClick={() => setSelectedRole('host')}
+                className={`flex-1 p-3 rounded-md border text-gray-800 ${
+                  selectedRole === 'host' 
+                    ? 'bg-blue-100 border-blue-500' 
+                    : 'border-gray-300 hover:bg-blue-50'
+                }`}
+              >
+                關主
+              </button>
+              <button
+                onClick={() => setSelectedRole('player')}
+                className={`flex-1 p-3 rounded-md border text-gray-800 ${
+                  selectedRole === 'player' 
+                    ? 'bg-green-100 border-green-500' 
+                    : 'border-gray-300 hover:bg-green-50'
+                }`}
+              >
+                玩家
+              </button>
+              <button
+                onClick={() => setSelectedRole('spectator')}
+                className={`flex-1 p-3 rounded-md border text-gray-800 ${
+                  selectedRole === 'spectator' 
+                    ? 'bg-gray-100 border-gray-500' 
+                    : 'border-gray-300 hover:bg-gray-50'
+                }`}
+              >
+                圍觀
+              </button>
+            </div>
+
             <button
               onClick={handleJoinRoom}
-              disabled={!nickname.trim() || isJoining}
-              className="w-full bg-blue-600 text白色 px-4 py-3 rounded-md hover:bg-blue-700 transition-colors font-medium disabled:bg-gray-400"
+              disabled={!nickname.trim() || !selectedRole || isJoining}
+              className="w-full bg-blue-600 text-white px-4 py-3 rounded-md hover:bg-blue-700"
             >
               {isJoining ? '加入中...' : '確認加入'}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // 在房間內顯示角色選擇
+  if (room && !selectedRole) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-100">
+        <div className="bg-white p-8 rounded-lg shadow-lg max-w-md w-full">
+          <h1 className="text-2xl font-bold mb-6 text-center text-gray-900">選擇身份</h1>
+          <div className="space-y-4">
+            {/* 如果還沒有關主才顯示關主選項 */}
+            {!room.players.some(p => p.isHost) && (
+              <button
+                onClick={() => {
+                  sendMessage('UPDATE_ROLE', { 
+                    roomId: room.id,
+                    userId: user?.id,
+                    role: 'host'
+                  });
+                  setSelectedRole('host');
+                }}
+                className="w-full p-4 bg-blue-100 text-blue-800 rounded-lg border-2 border-blue-200 hover:bg-blue-200"
+              >
+                關主
+              </button>
+            )}
+            <button
+              onClick={() => {
+                sendMessage('UPDATE_ROLE', {
+                  roomId: room.id,
+                  userId: user?.id,
+                  role: 'player'
+                });
+                setSelectedRole('player');
+              }}
+              className="w-full p-4 bg-green-100 text-green-800 rounded-lg border-2 border-green-200 hover:bg-green-200"
+            >
+              玩家
+            </button>
+            <button
+              onClick={() => {
+                sendMessage('UPDATE_ROLE', {
+                  roomId: room.id,
+                  userId: user?.id,
+                  role: 'spectator'
+                });
+                setSelectedRole('spectator');
+              }}
+              className="w-full p-4 bg-gray-100 text-gray-800 rounded-lg border-2 border-gray-200 hover:bg-gray-200"
+            >
+              圍觀
             </button>
           </div>
         </div>
@@ -205,7 +337,7 @@ export default function GameClient() {
           <div className="space-y-4">
             <button
               onClick={handleCreateRoom}
-              className="w-full bg-blue-600 text-white px-4 py-3 rounded-md hover:bg-blue-700 transition-colors font-medium"
+              className="w-full bg-blue-600 text白色 px-4 py-3 rounded-md hover:bg-blue-700 transition-colors font-medium"
             >
               創建房間
             </button>
@@ -221,7 +353,7 @@ export default function GameClient() {
               <button
                 onClick={handleInitialJoin}
                 disabled={roomCode.length !== 4}
-                className="w-full bg-green-600 text-white px-4 py-3 rounded-md hover:bg-green-700 transition-colors font-medium disabled:bg-gray-400"
+                className="w-full bg-green-600 text白色 px-4 py-3 rounded-md hover:bg-green-700 transition-colors font-medium disabled:bg-gray-400"
               >
                 確認房間號碼
               </button>
@@ -247,6 +379,21 @@ export default function GameClient() {
                 <span className="text-gray-600">在線玩家：</span>
                 <span className="text-gray-900">{room.players.length}</span>
               </div>
+              <div className="flex items-center gap-2">
+                <span className="text-gray-600">身份：</span>
+                {room && user && (
+                  <span className={`text-sm font-medium px-3 py-1.5 rounded-full shadow-sm ${
+                    // 使用 find 查找當前使用者並根據其角色顯示樣式
+                    room.players.find(p => p.id === user.id)?.role === 'host' ? 'bg-blue-100 text-blue-800 border border-blue-300' :
+                    room.players.find(p => p.id === user.id)?.role === 'player' ? 'bg-green-100 text-green-800 border border-green-300' :
+                    'bg-gray-100 text-gray-600 border border-gray-300'
+                  }`}>
+                    {room.players.find(p => p.id === user.id)?.role === 'host' ? '關主' :
+                    room.players.find(p => p.id === user.id)?.role === 'player' ? '玩家' :
+                    '圍觀者'}
+                  </span>
+                )}
+              </div>
             </div>
           )}
         </div>
@@ -268,7 +415,16 @@ export default function GameClient() {
               <div className="space-y-4">
                 <div className="bg-gray-50 p-4 rounded-lg">
                   <h3 className="font-semibold text-gray-900 mb-2">關主資訊</h3>
-                  <p className="text-gray-700">關主：{room?.gameState.host?.name || '等待關主加入'}</p>
+                  {room?.players.find(p => p.role === 'host') ? (
+                    <div className="flex items-center gap-2">
+                      <span className="text-gray-700">關主：</span>
+                      <span className="font-medium text-blue-800 bg-blue-100 px-2 py-1 rounded">
+                        {room.players.find(p => p.role === 'host')?.name}
+                      </span>
+                    </div>
+                  ) : (
+                    <p className="text-gray-700 italic">等待關主加入...</p>
+                  )}
                 </div>
                 
                 {/* 在線玩家列表移到這裡 */}
@@ -278,12 +434,12 @@ export default function GameClient() {
                     {room?.players.map((player) => (
                       <div 
                         key={player.id}
-                        className="flex items-center justify-between p-2 bg-white rounded"
+                        className="flex items-center justify-between p-2 bg白色 rounded"
                       >
                         <span className="text-gray-800">{player.name}</span>
-                        {player.isHost && (
-                          <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">關主</span>
-                        )}
+                        <span className={`text-xs px-2 py-1 rounded ${RoleManager.getRoleStyle(player.role)}`}>
+                          {RoleManager.getRoleDisplay(player.role)}
+                        </span>
                       </div>
                     ))}
                   </div>
@@ -292,27 +448,31 @@ export default function GameClient() {
             </div>
             
             {/* 關主回答區塊 */}
-            {user?.isHost && (
-              <div className="bg-white rounded-lg shadow-sm p-4">
-                <h3 className="text-xl font-bold mb-4 text-gray-900">問題回答</h3>
+            {user?.role === 'host' && (
+              <div className="bg-white rounded-lg shadow-sm p-4 mb-4">
+                <h3 className="text-xl font-bold mb-4 text-gray-900">未回答問題</h3>
                 <div className="space-y-4">
                   {room?.gameState.questions
                     .filter(q => !q.answer)
                     .map((q) => (
-                      <div key={q.id} className="bg-gray-50 rounded-lg p-4">
-                        <p className="text-gray-800 mb-2">{q.content}</p>
+                      <div key={q.id} className="bg-gray-50 rounded-lg p-4 border border-gray-200 hover:border-blue-300 transition-colors">
+                        <p className="text-gray-800 mb-2 text-lg">{q.content}</p>
                         <div className="flex justify-between items-center">
-                          <span className="text-sm text-gray-600">{q.askedBy}</span>
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm text-gray-600">提問者：</span>
+                            <span className="text-sm font-medium text-gray-800">{q.askedBy}</span>
+                            <span className="text-xs text-gray-500">{q.timestamp}</span>
+                          </div>
                           <div className="flex gap-2">
                             <button
                               onClick={() => handleAnswerQuestion(q.id, true)}
-                              className="px-3 py-1 text-sm bg-green-500 text-white rounded hover:bg-green-600"
+                              className="px-4 py-2 text-sm bg-green-500 text-white rounded-md hover:bg-green-600 transition-colors font-medium shadow-sm"
                             >
                               正確
                             </button>
                             <button
                               onClick={() => handleAnswerQuestion(q.id, false)}
-                              className="px-3 py-1 text-sm bg-red-500 text-white rounded hover:bg-red-600"
+                              className="px-4 py-2 text-sm bg-red-500 text-white rounded-md hover:bg-red-600 transition-colors font-medium shadow-sm"
                             >
                               錯誤
                             </button>
@@ -320,6 +480,11 @@ export default function GameClient() {
                         </div>
                       </div>
                     ))}
+                  {room?.gameState.questions.filter(q => !q.answer).length === 0 && (
+                    <div className="text-center py-8 text-gray-500">
+                      目前沒有待回答的問題
+                    </div>
+                  )}
                 </div>
               </div>
             )}

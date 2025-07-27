@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useGameState } from '../contexts/GameStateContext';
 import { useRoom } from '../contexts/RoomContext';
 import { useAuth } from '../contexts/AuthContext';
+import { RoleManager } from '../utils/roleManager';
 
 interface Message {
   id: string;
@@ -68,7 +69,7 @@ export default function ChatRoom({ type }: ChatRoomProps) {
                 <span>{msg.sender}</span>
                 <span>{msg.timestamp}</span>
               </div>
-              {type === 'question' && user?.isHost && !msg.answer && ( // 確保條件正確
+              {type === 'question' && user?.role === 'host' && !msg.answer && (
                 <div className="flex gap-2 mt-2">
                   <button
                     onClick={() => {
@@ -117,26 +118,29 @@ export default function ChatRoom({ type }: ChatRoomProps) {
           ))}
       </div>
       
-      <div className="border-t border-gray-200 p-4">
-        <div className="flex gap-2">
-          <input
-            type="text"
-            value={newMessage}
-            onChange={(e) => setNewMessage(e.target.value)}
-            onKeyDown={handleKeyPress}
-            onCompositionStart={() => setIsComposing(true)}
-            onCompositionEnd={() => setIsComposing(false)}
-            className="flex-grow border border-gray-300 rounded-md p-2 text-gray-800 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            placeholder="輸入訊息..."
-          />
-          <button
-            onClick={handleSendMessage}
-            className="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700 transition-colors duration-200 font-medium shadow-sm"
-          >
-            發送
-          </button>
+      {/* 只有玩家和關主可以發送訊息 */}
+      {user?.role !== 'spectator' && (
+        <div className="border-t border-gray-200 p-4">
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={newMessage}
+              onChange={(e) => setNewMessage(e.target.value)}
+              onKeyDown={handleKeyPress}
+              onCompositionStart={() => setIsComposing(true)}
+              onCompositionEnd={() => setIsComposing(false)}
+              className="flex-grow border border-gray-300 rounded-md p-2 text-gray-800 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              placeholder="輸入訊息..."
+            />
+            <button
+              onClick={handleSendMessage}
+              className="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700 transition-colors duration-200 font-medium shadow-sm"
+            >
+              發送
+            </button>
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }

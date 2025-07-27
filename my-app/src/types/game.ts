@@ -1,7 +1,10 @@
+import { UserRole } from '../utils/roleManager';
+
 export interface User {
   id: string;
   name: string;
-  isHost: boolean;
+  role: UserRole;
+  isHost?: boolean;
 }
 
 export interface GameState {

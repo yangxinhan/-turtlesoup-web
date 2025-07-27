@@ -45,7 +45,11 @@ wss.on('connection', (ws: WebSocket) => {
       switch (data.type) {
         case 'CREATE_ROOM':
           const newRoom = roomManager.createRoom(data.user);
-          extWs.send(JSON.stringify({ type: 'ROOM_UPDATE', room: newRoom }));
+          extWs.send(JSON.stringify({ 
+            type: 'ROOM_UPDATE', 
+            room: newRoom,
+            user: data.user // 包含 isHost 資訊
+          }));
           break;
 
         case 'JOIN_ROOM':
@@ -81,6 +85,21 @@ wss.on('connection', (ws: WebSocket) => {
             wss.clients.forEach(client => {
               if (client.readyState === WebSocket.OPEN) {
                 client.send(JSON.stringify({ type: 'ROOM_UPDATE', room: roomUpdate }));
+              }
+            });
+          }
+          break;
+
+        case 'UPDATE_ROLE':
+          const { roomId, userId, role } = data;
+          const updatedRoom = roomManager.updateUserRole(roomId, userId, role === 'host');
+          if (updatedRoom) {
+            wss.clients.forEach(client => {
+              if (client.readyState === WebSocket.OPEN) {
+                client.send(JSON.stringify({
+                  type: 'ROOM_UPDATE',
+                  room: updatedRoom
+                }));
               }
             });
           }
@@ -135,15 +154,16 @@ wss.on('connection', (ws: WebSocket) => {
           break;
 
         case 'QUESTION_ANSWER':
-          const { roomId, questionId, answer } = data;
+          // 避免重複宣告 roomId
+          const questionAnswer = data;
           // 廣播答案狀態給所有客戶端
           wss.clients.forEach(client => {
             if (client.readyState === WebSocket.OPEN) {
               client.send(JSON.stringify({
                 type: 'CHAT_MESSAGE',
-                roomId,
-                questionId,
-                answer
+                roomId: questionAnswer.roomId,
+                questionId: questionAnswer.questionId,
+                answer: questionAnswer.answer
               }));
             }
           });

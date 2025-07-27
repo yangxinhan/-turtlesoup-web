@@ -19,10 +19,12 @@ const RoomContext = createContext<RoomContextType | undefined>(undefined);
 export function RoomProvider({ children }: { children: React.ReactNode }) {
   const [room, setRoom] = useState<Room | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
 
   useEffect(() => {
     let ws: WebSocket | null = null;
+    let isActive = true; // 用於防止組件卸載後的更新
     let reconnectTimer: NodeJS.Timeout;
     let reconnectAttempts = 0;
     const maxReconnectAttempts = 5;
@@ -38,24 +40,26 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
         wsRef.current = ws;
 
         ws.onopen = () => {
+          if (!isActive) return;
           console.log('WebSocket 連接成功');
           setError(null);
           reconnectAttempts = 0;
         };
 
         ws.onmessage = (event) => {
+          if (!isActive) return;
           try {
             const data = JSON.parse(event.data);
-            switch (data.type) {
-              case 'ROOM_UPDATE':
-                setRoom(data.room);
-                break;
-              case 'ERROR':
-                setError(data.message);
-                break;
+            console.log('收到 WebSocket 訊息:', data);
+            
+            if (data.type === 'ROOM_UPDATE') {
+              setRoom(data.room);
+              if (data.user?.id === currentUser?.id) {
+                setCurrentUser(data.user);
+              }
             }
           } catch (err) {
-            console.error('WebSocket message error:', err);
+            console.error('WebSocket 訊息處理錯誤:', err);
           }
         };
 
@@ -66,13 +70,14 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
         };
 
       } catch (error) {
-        console.error('WebSocket 連接錯誤:', error);
+        console.error('WebSocket 連接失敗:', error);
       }
     };
 
     connect();
 
     return () => {
+      isActive = false;
       if (ws) {
         ws.close();
       }
@@ -80,7 +85,7 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
         clearTimeout(reconnectTimer);
       }
     };
-  }, []);
+  }, [currentUser?.id]);
 
   const sendMessage = (type: string, data: any) => {
     if (wsRef.current?.readyState === WebSocket.OPEN) {
@@ -113,6 +118,7 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
     <RoomContext.Provider value={{
       room,
       error,
+      // currentUser, // 添加 currentUser 到 context value
       createRoom,
       joinRoom,
       leaveRoom,

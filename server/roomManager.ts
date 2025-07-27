@@ -43,28 +43,26 @@ export class RoomManager {
   }
 
   joinRoom(code: string, user: User): Room {
-    console.log('嘗試加入房間，房間代碼:', code);
-    console.log('當前所有房間:', [...this.rooms.values()].map(r => r.code));
-
     const room = [...this.rooms.values()].find(r => r.code === code);
     
     if (!room) {
-      console.log('找不到房間:', code);
       throw new Error('找不到此房間');
     }
-
-    console.log('找到房間:', room);
     
     const newPlayer = {
+      ...user,
       id: Date.now().toString(),
       name: user.name.trim(),
-      isHost: false
+      role: user.role, // 保持原有的角色設定
+      isHost: user.role === 'host' // 根據角色設定 isHost
     };
 
     room.players.push(newPlayer);
+    if (newPlayer.isHost) {
+      room.host = newPlayer;
+    }
     room.gameState.players.push(newPlayer);
 
-    console.log('加入後的房間狀態:', room);
     return room;
   }
 
@@ -99,6 +97,22 @@ export class RoomManager {
       const question = room.gameState.questions.find(q => q.id === questionId);
       if (question) {
         question.answer = answer;
+      }
+      return room;
+    }
+    return null;
+  }
+
+  updateUserRole(roomId: string, userId: string, isHost: boolean): Room | null {
+    const room = this.rooms.get(roomId);
+    if (room) {
+      const player = room.players.find(p => p.id === userId);
+      if (player) {
+        player.isHost = isHost;
+        if (isHost) {
+          room.host = player;
+          room.gameState.host = player;
+        }
       }
       return room;
     }
